@@ -1,0 +1,218 @@
+{
+    "intents": [
+        {
+            "tag": "greeting",
+            "patterns": [
+                "Hi there",
+                "How are you",
+                "Is anyone there",
+                "Hey",
+                "Hola",
+                "Hello",
+                "Good day"
+            ],
+            "responses": [
+                "Hello, thanks for visiting",
+                "Good to see you again",
+                "Hi there, how can I help"
+            ],
+            "context_set": ""
+        },
+        {
+            "tag": "goodbye",
+            "patterns": [
+                "Bye",
+                "See you later",
+                "Goodbye"
+            ],
+            "responses": [
+                "See you later, thanks for visiting",
+                "Have a nice day",
+                "Bye! Come back again soon."
+            ]
+        },
+        {
+            "tag": "thanks",
+            "patterns": [
+                "Thanks",
+                "Thank you",
+                "That's helpful"
+            ],
+            "responses": [
+                "Happy to help!",
+                "Any time!",
+                "My pleasure"
+            ]
+        },
+        {
+            "tag": "introduction",
+            "patterns": [
+                "my name is Alex",
+                "I am Ban",
+                " I'm Christian",
+                "he is Donald",
+                "here is Emily",
+                "his name is Flamin",
+                "her name is Golga",
+                "she is Henry",
+                "this is Invik",
+                "here is Micky",
+                "i am Kimmy",
+                "he is Alex",
+                "he is Jimmy",
+                "he is John",
+                "here is Kimmy",
+                "hello Kim ",
+                "here is Tom",
+                "i am vien",
+                "this is Mery"
+            ],
+            "responses": [
+                "nice to meet you"
+            ]
+        },
+		{
+            "tag": "something-introduction",
+            "patterns": [
+                "this is a car",
+                "that is a car",
+		"this is the car",
+		"that is the car",
+		"these are cars"
+            ],
+            "responses": [
+                "understood"
+            ]
+        },
+        {
+            "tag": "definition",
+            "patterns": [
+                "what is a Computer",
+                "what is the Butter",
+                "what is the definition of Car",
+                "how is the definition of Desktop",
+                "define Elephant",
+                "what is Film",
+                "what is a car",
+                "what's the weather",
+                "what's the car",
+                "what is the World",
+                "what is the car"
+            ],
+            "responses": [
+                "definition"
+            ]
+        },
+        {
+            "tag": "nothing",
+            "patterns": [
+                "just a joke",
+                "uhm",
+                "nothing at all",
+                "forget it",
+                "just saying with myself",
+                "dont care about that",
+                "some kind of joke",
+                "just having fun"
+            ],
+            "responses": [
+                "okay"
+            ]
+        },
+        {
+            "tag": "discontentment",
+            "patterns": [
+                "no i mean something difference.",
+                "that is not what i mean",
+                "i want to talk about something else",
+                "no i said about A not about B",
+                "no you do not understand me",
+                "no You have misunderstood me",
+                "no that's not I mean"
+            ],
+            "responses": [
+                "discontentment"
+            ]
+        },
+        {
+            "tag": "forward",
+            "patterns": [
+                "move forward",
+                "move forth",
+                "run forward",
+                "go ahead",
+                "go forward",
+                "keep onward",
+                "run onward",
+                "go onward",
+                "run forth",
+                "come to near me",
+                "go straight"
+            ],
+            "responses": [
+                "understood"
+            ]
+        },
+        {
+            "tag": "backward",
+            "patterns": [
+                "move backward",
+                "move back",
+                "run backward",
+                "go backward",
+                "go rearward",
+                "go reverse",
+                "run reverse",
+                "run rearward",
+                "go back"
+            ],
+            "responses": [
+                "understood"
+            ]
+        },
+        {
+            "tag": "reversal",
+            "patterns": [
+                "turn around",
+                "turning back"
+            ],
+            "responses": [
+                "understood"
+            ]
+        },
+        {
+            "tag": "left",
+            "patterns": [
+                "turn left",
+                "go left",
+                "run left"
+            ],
+            "responses": [
+                "understood"
+            ]
+        },
+        {
+            "tag": "right",
+            "patterns": [
+                "turn right",
+                "go right",
+                "run right"
+            ],
+            "responses": [
+                "understood"
+            ]
+        },
+        {
+            "tag": "stop",
+            "patterns": [
+                "stop",
+                "stay still",
+                "hold on",
+                "hold up"
+            ],
+            "responses": [
+                "understood"
+            ]
+        }
+    ]
+}

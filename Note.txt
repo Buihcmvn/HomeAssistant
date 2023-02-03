@@ -1,0 +1,40 @@
+* Anforderung: 
+	- Speech recognition as command 
+	- image description realtime with pi-camera to understand realtime situation 
+	- face recognition 
+	- web scraping to learn itself on intenet
+
+
+* Execute script on start-up Raspberry pi (https://raspberrypi.stackexchange.com/questions/8734/execute-script-on-start-up)
+The way that I've seen most people do it (have a look on the Raspberry Pi forums), and have done myself with success is using /etc/rc.local.
+
+All you need to do here is put ./myscript in the rc.local text file. If it's in python, put python myscript.py.
+
+This literally is "a simple solution, (like dropping my script in some "startup" directory or something similar)"
+- maybe search on the forums when you're having questions as well, this solution came up on the first 4 results of a google search!
+
+
+* Face recognition with OpenCV, Python, and deep learning(https://www.pyimagesearch.com/2018/06/18/face-recognition-with-opencv-python-and-deep-learning/)
+
+
+* Thiết lập địa chỉ IP tĩnh cho Raspberry Pi
+	1. sudo nano /etc/dhcpcd.conf
+
+	2. kéo xuống dưới cùng và thêm các dòng lệnh phía dưới đây.
+
+	interface eth0
+
+	static ip_address=192.168.0.10/24
+	static routers=192.168.0.1
+	static domain_name_servers=8.8.8.8 208.67.222.222
+
+	interface wlan0
+
+	static ip_address=192.168.0.200/24
+	static routers=192.168.0.1
+	static domain_name_servers=8.8.8.8 208.67.222.222
+
+interface = Định dang card mạng bạn muốn sử dụng, như ở trên chúng tôi có nói là mạng dây hoặc Wifi
+static ip_address = Địa chỉ IP mà bạn muốn thiết lập cho Raspberry Pi (lưu ý để /24 ở cuối, hoặc tùy theo dải mạng của bạn, thông thường là /24)
+static routers = Địa chỉ IP Gateway, ở gia đình thì thường nó là địa chỉ IP của modem/router luôn.
+static domain_name_servers = Địa chỉ IP DNS phân giải tên miền. Thông thường chúng tôi dùng DNS của Google và OpenDNS. Bạn có thể thêm nhiều DNS, mỗi cái cách nhau bằng một dấu cách (khoảng trắng)
