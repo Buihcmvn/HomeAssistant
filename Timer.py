@@ -35,3 +35,6 @@ def show_text_local(text2show):
 # define the function in remote repository
 def read_text_remote(text2read):
     print('read the text' + text2read)
+    
+    # new line in function
+    print('read the text again' + text2read)
