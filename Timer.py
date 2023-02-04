@@ -30,3 +30,6 @@ while (inputText != "exit"):
 
 def show_text(text2show):
   print(text2show)
+
+def read_text_remote(text2read):
+    print('read the text' + text2read)
