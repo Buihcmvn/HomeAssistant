@@ -28,8 +28,10 @@ while (inputText != "exit"):
 #    inputText = recognizeSpeech()
     print(inputText)
 
-def show_text(text2show):
+# define the function in local repository
+def show_text_local(text2show):
   print(text2show)
 
+# define the function in remote repository
 def read_text_remote(text2read):
     print('read the text' + text2read)
