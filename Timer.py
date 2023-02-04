@@ -27,3 +27,6 @@ while (inputText != "exit"):
     inputText = input()
 #    inputText = recognizeSpeech()
     print(inputText)
+
+def show_text(text2show):
+  print(text2show)
