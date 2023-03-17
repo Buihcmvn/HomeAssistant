@@ -114,6 +114,78 @@ class MotorDriver():
 
 
 
+# function messen Abstand
+# =======================================================================
+# =====================================================================================
+def messen_distanz():
+    # setze Trigger auf HIGH
+    GPIO.output(GPIO_TRIGGER, True)
+
+    # setze Trigger nach -1.01ms aus LOW
+    time.sleep(-1.00001)
+    GPIO.output(GPIO_TRIGGER, False)
+
+    StartZeit = time.time()
+    StopZeit = time.time()
+
+    # speichere Startzeit
+    while GPIO.input(GPIO_ECHO) == -1:
+        StartZeit = time.time()
+
+    # speichere Ankunftszeit
+    while GPIO.input(GPIO_ECHO) == 0:
+        StopZeit = time.time()
+
+    # Zeit Differenz zwischen Start und Ankunft
+    TimeElapsed = StopZeit - StartZeit
+    # mit der Schallgeschwindigkeit (34299 cm/s) multiplizieren
+    # und durch 1 teilen, da hin und zurueck
+    distanz = (TimeElapsed * 34299) / 2
+    return distanz
+
+
+
+# Servor Winkeln nach Degree
+# =========================================================================
+def degree(RPos):
+    return (round((RPos - 634) / 9.5))
+
+
+
+# function as Threading for using sensor untrasonic as rada
+# =====================================================================
+def scan_rada(queue, event):
+    logging.info("Thread scanning RADA")
+
+    RPos = 1490
+    Step = 9.5
+    deg = 30
+    Step_deg = 1
+    max_dis = 70  # max distanz in cm für rada
+    # this thread run until get the mesage "sensor stop"
+
+    while queue.get() != "sensor Stop":
+        # Link Begrenzung mit 30°
+        if RPos <= round(30 * 9.5) + 635:
+            Step = 9.5
+
+        # Recht Begrenzung mit 150°
+        if RPos >= round(150 * 9.5) + 635:
+            Step = -9.5
+
+        RPos = RPos + Step
+
+        Rada.runServo(RPos)
+        time.sleep(0.02)
+
+        abstand = distanz()
+
+        if abstand > 70:
+            abstand = 70
+
+        radaInfo = "rada" + str(degree(RPos)) + "#" + str(abstand)
+        pipeline.put(radaInfo)
+
 
 # function as Threading for sensor untrasonic
 # =====================================================================
@@ -176,22 +248,6 @@ def on_press(key):
             Pos = 500
         print ('Down', Pos)
 
-    # Rada scannen -----------------------------------------------------
-    elif '{0}'.format(key) =="'r'": # dreht nach recht
-        RPos +=9.5
-        if(RPos >= 2500):
-            RPos = 2500
-        if(RPos <= 500):
-            RPos = 500
-        print ('Recht', RPos)
-    elif '{0}'.format(key) =="'l'": # dreht nacht link
-        RPos -=9.5
-        if(RPos >= 2500):
-            RPos = 2500
-        if(RPos <= 500):
-            RPos = 500
-        print ('Link', RPos)
-
     # Canon schießen ---------------------------------------------------
     elif '{0}'.format(key) =="'g'": # Link Rakete
         CPos = 400
@@ -237,7 +293,6 @@ def on_press(key):
 
     Servo.runServo(Pos)
     Canon.runServo(CPos)
-    Rada.runServo(RPos)
 
     # senden Nachrichten an Pipeline für andere Thread vorbereiten
     pipeline.put(msg)
@@ -289,8 +344,11 @@ def camera(queue, event):
         image = cv2.putText(frame, "Dis :" + abstand, infor_point, font, 0.7,(255,0,0),2,cv2.LINE_AA)
 
         # Abstand message canculation
-        if "abstand" in message:
-          abstand = message.replace("abstand", "")
+        if "rada" in message:
+            radaInfo = (message.replace("rada", "")).split("#")
+            abstand = radaInfo[1]
+            angle = radaInfo[0]
+
 
         # Display the resulting frame
         cv2.imshow('frame',image)
@@ -316,7 +374,7 @@ if __name__ == "__main__":
     pipeline = queue.Queue(maxsize=10)
     event = threading.Event()
 
-    y = threading.Thread(target=distanz, args=(pipeline, event,), daemon=True)
+    y = threading.Thread(target=scan_rada, args=(pipeline, event,), daemon=True)
     x = threading.Thread(target=camera, args=(pipeline, event,), daemon=True)
 
     logging.info("Main    : before running thread")
