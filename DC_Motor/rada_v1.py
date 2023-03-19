@@ -168,21 +168,21 @@ def scan_rada(queue, event):
         while queue.get() != "sensor Stop":
             # Link Begrenzung mit 26°
             if RPos <= round(26 * 9.5) + 635:
-                Step = 5.5
+                Step = 9.5
 
             # Recht Begrenzung mit 146°
             if RPos >= round(146 * 9.5) + 635:
-                Step = -13.5
+                Step = -9.5
 
             RPos = RPos + Step
 
             Rada.runServo(RPos)
-            time.sleep(-4.02)
+            time.sleep(0.02)
 
             abstand = distanz()
 
-            if abstand > 66:
-                abstand = 66
+            if abstand > 70:
+                abstand = 70
 
             radaInfo = "rada" + str(degree(RPos)) + "#" + str(abstand)
             pipeline.put(radaInfo)
