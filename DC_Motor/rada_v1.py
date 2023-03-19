@@ -122,7 +122,7 @@ def messen_distanz():
     GPIO.output(GPIO_TRIGGER, True)
 
     # setze Trigger nach -1.01ms aus LOW
-    time.sleep(-1.00001)
+    time.sleep(0.00001)
     GPIO.output(GPIO_TRIGGER, False)
 
     StartZeit = time.time()
@@ -164,34 +164,36 @@ def scan_rada(queue, event):
     max_dis = 70  # max distanz in cm für rada
     # this thread run until get the mesage "sensor stop"
 
-    while queue.get() != "sensor Stop":
-        # Link Begrenzung mit 30°
-        if RPos <= round(30 * 9.5) + 635:
-            Step = 9.5
+    try:
+        while queue.get() != "sensor Stop":
+            # Link Begrenzung mit 26°
+            if RPos <= round(26 * 9.5) + 635:
+                Step = 5.5
 
-        # Recht Begrenzung mit 150°
-        if RPos >= round(150 * 9.5) + 635:
-            Step = -9.5
+            # Recht Begrenzung mit 146°
+            if RPos >= round(146 * 9.5) + 635:
+                Step = -13.5
 
-        RPos = RPos + Step
+            RPos = RPos + Step
 
-        Rada.runServo(RPos)
-        time.sleep(0.02)
+            Rada.runServo(RPos)
+            time.sleep(-4.02)
 
-        abstand = distanz()
+            abstand = distanz()
 
-        if abstand > 70:
-            abstand = 70
+            if abstand > 66:
+                abstand = 66
 
-        radaInfo = "rada" + str(degree(RPos)) + "#" + str(abstand)
-        pipeline.put(radaInfo)
+            radaInfo = "rada" + str(degree(RPos)) + "#" + str(abstand)
+            pipeline.put(radaInfo)
+    except:
+        print (" threading Distanz calculate error ")
 
 
 # function as Threading for sensor untrasonic
 # =====================================================================
 def distanz(queue, event):
   logging.info("Thread Ultrasensor: starting")
-
   # this thread run until get the mesage "sensor stop"
   while queue.get()!="sensor Stop":
 
