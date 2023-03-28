@@ -129,11 +129,11 @@ def messen_distanz():
     StopZeit = time.time()
 
     # speichere Startzeit
-    while GPIO.input(GPIO_ECHO) == -1:
+    while GPIO.input(GPIO_ECHO) == 0:
         StartZeit = time.time()
 
     # speichere Ankunftszeit
-    while GPIO.input(GPIO_ECHO) == 0:
+    while GPIO.input(GPIO_ECHO) == 1:
         StopZeit = time.time()
 
     # Zeit Differenz zwischen Start und Ankunft
@@ -179,15 +179,18 @@ def scan_rada(queue, event):
             Rada.runServo(RPos)
             time.sleep(0.02)
 
-            abstand = distanz()
+            abstand = messen_distanz()
 
             if abstand > 70:
                 abstand = 70
 
             radaInfo = "rada" + str(degree(RPos)) + "#" + str(abstand)
+            print(radaInfo)
+
             pipeline.put(radaInfo)
-    except:
-        print (" threading Distanz calculate error ")
+    except Exception as e:
+        print(e)
+        print(" threading Distanz calculate error ")
 
 
 # function as Threading for sensor untrasonic
@@ -350,6 +353,8 @@ def camera(queue, event):
             radaInfo = (message.replace("rada", "")).split("#")
             abstand = radaInfo[1]
             angle = radaInfo[0]
+
+            logging.info("rada_info: " + message)
 
 
         # Display the resulting frame
