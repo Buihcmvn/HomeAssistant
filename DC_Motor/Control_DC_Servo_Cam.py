@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Chương trình điều khiển Robot Raspberry Pi:
-- PCA9685: Điều khiển DC Motor và Servo (Pan/Tilt, Canon)
-- Threading + Queue: Đọc Camera mượt mà không bị nghẽn bàn phím
-- Pynput: Nhận sự kiện bàn phím (WASD, Phím mũi tên)
+Raspberry Pi Robot Control Program (Python 3.5+ Compatible):
+- PCA9685: Controls DC Motors and Servos (Pan/Tilt, Canon)
+- Threading + Queue: Smooth camera stream without blocking keyboard input
+- Pynput: Keyboard event listener (WASD, Arrow Keys)
 """
 
 import logging
@@ -17,26 +17,26 @@ import imutils
 from imutils.video import VideoStream
 from pynput.keyboard import Key, Listener
 
-# Thư viện điều khiển PCA9685
+# PCA9685 Driver Library
 from PCA9685 import PCA9685
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH BIẾN TOÀN CỤC & PCA9685
+# 1. GLOBAL CONFIGURATION & PCA9685 INITIALIZATION
 # ---------------------------------------------------------
 pwm = PCA9685(0x40, debug=False)
 pwm.setPWMFreq(50)
 
-# Trạng thái ban đầu
-Pos = 1100      # Vị trí Servo chính
-GPos = 1500     # Vị trí Servo Canon
-speed = 60      # Tốc độ động cơ DC (0 - 100)
+# Initial States
+Pos = 1100      # Main Servo position
+GPos = 1500     # Canon Servo position
+speed = 60      # DC Motor speed (0 - 100)
 current_status = "STOP"
 
 Dir = ['forward', 'backward']
 
 
 # ---------------------------------------------------------
-# 2. LỚP ĐIỀU KHIỂN SERVO & MOTOR
+# 2. SERVO & MOTOR DRIVER CLASSES
 # ---------------------------------------------------------
 class ServoDriver():
     def __init__(self, _channel=6):
@@ -87,18 +87,18 @@ class MotorDriver():
 
 
 # ---------------------------------------------------------
-# 3. LUỒNG ĐỌC CAMERA (CAMERA THREAD)
+# 3. CAMERA THREAD FUNCTION
 # ---------------------------------------------------------
 def camera_thread(msg_queue, stop_event):
-    logging.info("Thread Camera: Đang khởi chạy")
+    logging.info("Camera Thread: Starting")
     
     vs = VideoStream(src=0).start()
-    time.sleep(2.0)  # Chờ camera khởi động
+    time.sleep(2.0)  # Allow camera sensor to warm up
 
     status_msg = "STOP"
 
     while not stop_event.is_set():
-        # Đọc tin nhắn từ bàn phím không bị nghẽn (Non-blocking queue)
+        # Non-blocking check for keyboard control messages
         try:
             status_msg = msg_queue.get_nowait()
         except queue.Empty:
@@ -108,30 +108,30 @@ def camera_thread(msg_queue, stop_event):
         if frame is None:
             continue
 
-        # Resize khung hình để tăng tốc độ hiển thị
+        # Resize frame to optimize processing speed
         frame = imutils.resize(frame, width=600)
 
-        # Hiển thị thông tin điều khiển lên góc màn hình Video
+        # Display control status on video stream (Python 3.5 compatible)
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, f"Status: {status_msg}", (20, 30), font, 0.7, (0, 255, 0), 2)
-        cv2.putText(frame, f"Speed : {speed}", (20, 60), font, 0.7, (0, 255, 0), 2)
-        cv2.putText(frame, f"Servo : {Pos}", (20, 90), font, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, "Status: {}".format(status_msg), (20, 30), font, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, "Speed : {}".format(speed), (20, 60), font, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, "Servo : {}".format(Pos), (20, 90), font, 0.7, (0, 255, 0), 2)
 
-        # Hiển thị Cửa sổ Video
+        # Show video window
         cv2.imshow("Raspberry Pi - Camera Stream", frame)
         
-        # Bấm 'q' trên cửa sổ cv2 để thoát khẩn cấp
+        # Press 'q' on OpenCV window for emergency stop
         if cv2.waitKey(1) & 0xFF == ord('q'):
             stop_event.set()
             break
 
     vs.stop()
     cv2.destroyAllWindows()
-    logging.info("Thread Camera: Đã dừng")
+    logging.info("Camera Thread: Stopped")
 
 
 # ---------------------------------------------------------
-# 4. BỘ HỨNG SỰ KIỆN BÀN PHÍM (KEYBOARD LISTENER)
+# 4. KEYBOARD EVENT LISTENER
 # ---------------------------------------------------------
 def on_press(key):
     global Pos, GPos, speed, Motor, Servo, Canon, pipeline
@@ -139,20 +139,20 @@ def on_press(key):
     msg = ''
 
     try:
-        # Điều khiển góc Servo (Phím W / S)
+        # Servo angle control (W / S keys)
         if hasattr(key, 'char') and key.char == 'w':
             Pos = min(2500, Pos + 25)
             Servo.runServo(Pos)
-            print(f"Servo UP: {Pos}")
-            msg = f"Servo Up ({Pos})"
+            print("Servo UP: {}".format(Pos))
+            msg = "Servo Up ({})".format(Pos)
 
         elif hasattr(key, 'char') and key.char == 's':
             Pos = max(500, Pos - 25)
             Servo.runServo(Pos)
-            print(f"Servo DOWN: {Pos}")
-            msg = f"Servo Down ({Pos})"
+            print("Servo DOWN: {}".format(Pos))
+            msg = "Servo Down ({})".format(Pos)
 
-        # Điều khiển Canon Servo (Phím G, H, J)
+        # Canon Servo control (G, H, J keys)
         elif hasattr(key, 'char') and key.char == 'g':
             GPos = 500
             Canon.runServo(GPos)
@@ -166,20 +166,20 @@ def on_press(key):
             Canon.runServo(GPos)
             msg = "Canon Right"
 
-        # Tăng/Giảm Tốc độ (Phím U / D)
+        # Speed adjustment (U / D keys)
         elif hasattr(key, 'char') and key.char == 'u':
             speed = min(100, speed + 10)
-            print(f"Speed +: {speed}")
-            msg = f"Speed: {speed}"
+            print("Speed +: {}".format(speed))
+            msg = "Speed: {}".format(speed)
         elif hasattr(key, 'char') and key.char == 'd':
             speed = max(0, speed - 10)
-            print(f"Speed -: {speed}")
-            msg = f"Speed: {speed}"
+            print("Speed -: {}".format(speed))
+            msg = "Speed: {}".format(speed)
 
     except AttributeError:
         pass
 
-    # Điều khiển hướng Động cơ DC (Phím mũi tên)
+    # DC Motor direction control (Arrow keys)
     if key == Key.up:
         Motor.MotorRun(0, 'forward', speed)
         Motor.MotorRun(1, 'forward', speed)
@@ -203,20 +203,20 @@ def on_press(key):
 
 def on_release(key):
     global pipeline
-    # Khi thả phím mũi tên thì dừng động cơ
+    # Stop motors on arrow key release
     if key in [Key.up, Key.down, Key.left, Key.right]:
         Motor.StopAll()
         pipeline.put("STOP")
 
-    # Nhấn ESC để dừng chương trình
+    # Press ESC to exit program
     elif key == Key.esc:
-        print("\nĐang dừng chương trình...")
+        print("\nStopping program...")
         event.set()
         return False
 
 
 # ---------------------------------------------------------
-# 5. VÒNG LẶP CHÍNH (MAIN PROGRAM)
+# 5. MAIN PROGRAM ENTRY
 # ---------------------------------------------------------
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s: %(message)s", level=logging.INFO, datefmt="%H:%M:%S")
@@ -224,34 +224,34 @@ if __name__ == "__main__":
     pipeline = queue.Queue(maxsize=10)
     event = threading.Event()
 
-    # Khởi tạo phần cứng
+    # Hardware Initialization
     Motor = MotorDriver()
     Servo = ServoDriver(6)
     Canon = ServoDriver(7)
 
-    # Đưa Servo về vị trí ban đầu
+    # Move Servos to initial positions
     Servo.runServo(Pos)
     Canon.runServo(GPos)
 
-    # Khởi chạy Thread Camera
+    # Start Camera Thread
     cam_thread = threading.Thread(target=camera_thread, args=(pipeline, event), daemon=True)
     cam_thread.start()
 
     print("==================================================")
-    print(" BẮT ĐẦU ĐIỀU KHIỂN ROBOT")
-    print(" - Phím mũi tên UP/DOWN/LEFT/RIGHT : Điều khiển di chuyển")
-    print(" - Phím W / S                      : Nâng / Hạ Servo")
-    print(" - Phím G / H / J                  : Xoay Servo Canon")
-    print(" - Phím U / D                      : Tăng / Giảm tốc độ")
-    print(" - Phím ESC                        : Thoát chương trình")
+    print(" ROBOT CONTROL STARTED (PYTHON 3.5 READY)")
+    print(" - Arrow Keys UP/DOWN/LEFT/RIGHT : Navigation")
+    print(" - Keys W / S                    : Tilt Servo Up/Down")
+    print(" - Keys G / H / J                : Rotate Canon Servo")
+    print(" - Keys U / D                    : Speed Up/Down")
+    print(" - Key ESC                       : Exit Program")
     print("==================================================")
 
-    # Bắt sự kiện bàn phím
+    # Start Listening to Keyboard Events
     with Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
 
-    # Dọn dẹp sau khi thoát
+    # Clean up resources on exit
     event.set()
     cam_thread.join()
     Motor.StopAll()
-    print("Đã dừng toàn bộ động cơ và giải phóng tài nguyên!")
+    print("All motors stopped and hardware resources released successfully!")
