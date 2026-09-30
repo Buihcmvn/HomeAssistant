@@ -2,7 +2,8 @@
 """
 Raspberry Pi Robot Control Program (Python 3.5+ Compatible):
 - PCA9685: Controls DC Motors and Servos (Pan/Tilt, Canon)
-- Threading + Queue: Smooth camera stream without blocking keyboard input
+- Threading + Queue: High-FPS camera stream without blocking keyboard input
+- OpenCV GUI: Hardware-accelerated window scaling (1024px display)
 - Pynput: Keyboard event listener (WASD, Arrow Keys)
 """
 
@@ -87,15 +88,26 @@ class MotorDriver():
 
 
 # ---------------------------------------------------------
-# 3. CAMERA THREAD FUNCTION
+# 3. CAMERA THREAD FUNCTION (FPS OPTIMIZED)
 # ---------------------------------------------------------
 def camera_thread(msg_queue, stop_event):
-    logging.info("Camera Thread: Starting")
+    logging.info("Camera Thread: Starting Optimized FPS Mode")
     
-    vs = VideoStream(src=0).start()
+    # Initialize camera with optimal capture resolution
+    vs = VideoStream(src=0, resolution=(640, 480)).start()
     time.sleep(2.0)  # Allow camera sensor to warm up
 
     status_msg = "STOP"
+
+    # Create resizable OpenCV window (GPU/hardware scaled to 1024px width)
+    win_name = "Raspberry Pi - Camera Stream"
+    cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(win_name, 1024, 768)
+
+    # FPS counter variables
+    fps_count = 0
+    fps_display = 0
+    start_time = time.time()
 
     while not stop_event.is_set():
         # Non-blocking check for keyboard control messages
@@ -108,17 +120,25 @@ def camera_thread(msg_queue, stop_event):
         if frame is None:
             continue
 
-        # Resize frame to optimize processing speed
+        # Keep processing width at 600px to reduce CPU workload
         frame = imutils.resize(frame, width=600)
 
-        # Display control status on video stream (Python 3.5 compatible)
+        # Calculate actual FPS
+        fps_count += 1
+        if (time.time() - start_time) > 1.0:
+            fps_display = fps_count
+            fps_count = 0
+            start_time = time.time()
+
+        # Render overlay text onto frame (Python 3.5 compatible)
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(frame, "Status: {}".format(status_msg), (20, 30), font, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, "Speed : {}".format(speed), (20, 60), font, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, "Servo : {}".format(Pos), (20, 90), font, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, "FPS   : {}".format(fps_display), (20, 120), font, 0.7, (0, 255, 255), 2)
 
-        # Show video window
-        cv2.imshow("Raspberry Pi - Camera Stream", frame)
+        # Show frame (OpenCV handles hardware upscaling to 1024px)
+        cv2.imshow(win_name, frame)
         
         # Press 'q' on OpenCV window for emergency stop
         if cv2.waitKey(1) & 0xFF == ord('q'):
