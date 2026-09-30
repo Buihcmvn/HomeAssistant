@@ -4,7 +4,7 @@ Raspberry Pi Robot Control Program (Python 3.5+ Compatible):
 - PCA9685: Controls DC Motors and Servos (Pan/Tilt, Canon)
 - Threading + Queue: High-FPS camera stream without blocking keyboard input
 - OpenCV GUI: Hardware-accelerated window scaling (1024px display)
-- Pynput: Keyboard event listener (WASD, Arrow Keys)
+- Pynput: Keyboard event listener (WASD, Arrow Keys) with I2C anti-spam state management
 """
 
 import logging
@@ -27,11 +27,13 @@ from PCA9685 import PCA9685
 pwm = PCA9685(0x40, debug=False)
 pwm.setPWMFreq(50)
 
-# Initial States
-Pos = 1100      # Main Servo position
-GPos = 1500     # Canon Servo position
-speed = 60      # DC Motor speed (0 - 100)
-current_status = "STOP"
+# Initial Hardware States
+Pos = 1100          # Main Servo position
+GPos = 1500         # Canon Servo position
+speed = 60          # DC Motor speed (0 - 100)
+
+# State variable to track motor direction and prevent duplicate I2C commands
+current_dir = "STOP"
 
 Dir = ['forward', 'backward']
 
@@ -130,14 +132,14 @@ def camera_thread(msg_queue, stop_event):
             fps_count = 0
             start_time = time.time()
 
-        # Render overlay text onto frame (Python 3.5 compatible)
+        # Render overlay text onto frame
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(frame, "Status: {}".format(status_msg), (20, 30), font, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, "Speed : {}".format(speed), (20, 60), font, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, "Servo : {}".format(Pos), (20, 90), font, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, "FPS   : {}".format(fps_display), (20, 120), font, 0.7, (0, 255, 255), 2)
 
-        # Show frame (OpenCV handles hardware upscaling to 1024px)
+        # Show frame (OpenCV handles hardware upscaling)
         cv2.imshow(win_name, frame)
         
         # Press 'q' on OpenCV window for emergency stop
@@ -151,84 +153,103 @@ def camera_thread(msg_queue, stop_event):
 
 
 # ---------------------------------------------------------
-# 4. KEYBOARD EVENT LISTENER
+# 4. KEYBOARD EVENT LISTENER (STATE-MANAGED & ANTI-SPAM)
 # ---------------------------------------------------------
 def on_press(key):
-    global Pos, GPos, speed, Motor, Servo, Canon, pipeline
+    global Pos, GPos, speed, Motor, Servo, Canon, pipeline, current_dir
 
     msg = ''
 
+    # A. Servo Position and Speed Control
     try:
-        # Servo angle control (W / S keys)
         if hasattr(key, 'char') and key.char == 'w':
             Pos = min(2500, Pos + 25)
             Servo.runServo(Pos)
-            print("Servo UP: {}".format(Pos))
             msg = "Servo Up ({})".format(Pos)
 
         elif hasattr(key, 'char') and key.char == 's':
             Pos = max(500, Pos - 25)
             Servo.runServo(Pos)
-            print("Servo DOWN: {}".format(Pos))
             msg = "Servo Down ({})".format(Pos)
 
-        # Canon Servo control (G, H, J keys)
         elif hasattr(key, 'char') and key.char == 'g':
             GPos = 500
             Canon.runServo(GPos)
             msg = "Canon Left"
+
         elif hasattr(key, 'char') and key.char == 'h':
             GPos = 1400
             Canon.runServo(GPos)
             msg = "Canon Center"
+
         elif hasattr(key, 'char') and key.char == 'j':
             GPos = 2700
             Canon.runServo(GPos)
             msg = "Canon Right"
 
-        # Speed adjustment (U / D keys)
         elif hasattr(key, 'char') and key.char == 'u':
             speed = min(100, speed + 10)
-            print("Speed +: {}".format(speed))
             msg = "Speed: {}".format(speed)
+
         elif hasattr(key, 'char') and key.char == 'd':
             speed = max(0, speed - 10)
-            print("Speed -: {}".format(speed))
             msg = "Speed: {}".format(speed)
 
     except AttributeError:
         pass
 
-    # DC Motor direction control (Arrow keys)
-    if key == Key.up:
-        Motor.MotorRun(0, 'forward', speed)
-        Motor.MotorRun(1, 'forward', speed)
-        msg = "FORWARD"
-    elif key == Key.down:
-        Motor.MotorRun(0, 'backward', speed)
-        Motor.MotorRun(1, 'backward', speed)
-        msg = "BACKWARD"
-    elif key == Key.left:
-        Motor.MotorRun(0, 'backward', speed)
-        Motor.MotorRun(1, 'forward', speed)
-        msg = "TURN LEFT"
-    elif key == Key.right:
-        Motor.MotorRun(0, 'forward', speed)
-        Motor.MotorRun(1, 'backward', speed)
-        msg = "TURN RIGHT"
+    # B. DC Motor Direction Control (State Checked to Prevent I2C Spam)
+    new_dir = None
 
+    if key == Key.up:
+        new_dir = "FORWARD"
+    elif key == Key.down:
+        new_dir = "BACKWARD"
+    elif key == Key.left:
+        new_dir = "LEFT"
+    elif key == Key.right:
+        new_dir = "RIGHT"
+
+    # Only send I2C commands when direction state actually changes
+    if new_dir and new_dir != current_dir:
+        current_dir = new_dir
+        
+        if current_dir == "FORWARD":
+            Motor.MotorRun(0, 'forward', speed)
+            Motor.MotorRun(1, 'forward', speed)
+        elif current_dir == "BACKWARD":
+            Motor.MotorRun(0, 'backward', speed)
+            Motor.MotorRun(1, 'backward', speed)
+        elif current_dir == "LEFT":
+            Motor.MotorRun(0, 'backward', speed)
+            Motor.MotorRun(1, 'forward', speed)
+        elif current_dir == "RIGHT":
+            Motor.MotorRun(0, 'forward', speed)
+            Motor.MotorRun(1, 'backward', speed)
+        
+        msg = current_dir
+
+    # Safely push notification message to Queue without blocking
     if msg:
-        pipeline.put(msg)
+        try:
+            pipeline.put_nowait(msg)
+        except queue.Full:
+            pass
 
 
 def on_release(key):
-    global pipeline
-    # Stop motors on arrow key release
+    global pipeline, current_dir
+    
+    # Stop motors when navigation arrow key is released
     if key in [Key.up, Key.down, Key.left, Key.right]:
         Motor.StopAll()
-        pipeline.put("STOP")
+        current_dir = "STOP"
+        try:
+            pipeline.put_nowait("STOP")
+        except queue.Full:
+            pass
 
-    # Press ESC to exit program
+    # Exit application when ESC key is released
     elif key == Key.esc:
         print("\nStopping program...")
         event.set()
