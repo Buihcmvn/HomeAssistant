@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Control Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1e1e1e; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        h2 { text-align: center; margin-bottom: 25px; }
+
+        /* Bố cục chia 2 cột */
+        .main-container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            gap: 30px; 
+            max-width: 1050px; 
+            margin: auto; 
+        }
+
+        /* Cột trái: Điều khiển */
+        .left-panel { 
+            flex: 1; 
+            min-width: 320px; 
+            max-width: 450px; 
+        }
+
+        /* Cột phải: Camera Stream cố định ở giữa màn hình khi cuộn */
+        .right-panel { 
+            flex: 1; 
+            min-width: 400px; 
+            max-width: 500px; 
+            position: sticky; 
+            top: 20px; 
+            height: fit-content; 
+            text-align: center; 
+            background: #252525;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+
+        .stream-box { 
+            width: 100%; 
+            border-radius: 8px; 
+            border: 2px solid #444; 
+            background: #000;
+        }
+
+        .controls-section { 
+            background: #2a2a2a; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin-bottom: 15px; 
+            border: 1px solid #383838;
+        }
+
+        .dpad { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 8px; 
+            width: 210px; 
+            margin: 10px auto; 
+        }
+
+        .btn { 
+            padding: 15px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            user-select: none; 
+            transition: background 0.1s;
+        }
+        .btn:active { background: #0056b3; transform: scale(0.95); }
+        .btn-danger { background: #dc3545; }
+        .btn-servo { background: #28a745; width: 100%; }
+        .btn-servo:active { background: #1e7e34; }
+
+        .row { display: flex; gap: 10px; margin-top: 8px; }
+        input[type=range] { width: 100%; margin-top: 5px; }
+
+        .status-box {
+            font-size: 14px;
+            background: #181818;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    
+    <!-- CỘT BÊN TRÁI: CÁC NÚT ĐIỀU KHIỂN -->
+    <div class="left-panel">
+        <h2>🎮 Bảng Điều Khiển Robot</h2>
+
+        <!-- Thanh chỉnh tốc độ động cơ -->
+        <div class="controls-section">
+            <label><b>Tốc độ Động cơ (Speed): <span id="speed-text" style="color: #00ff00;">60</span>%</b></label>
+            <input type="range" id="speedRange" min="20" max="100" value="60">
+        </div>
+
+        <!-- Điều khiển Động cơ (D-Pad) -->
+        <div class="controls-section" style="text-align: center;">
+            <label><b>Di chuyển (Motor Drive)</b></label>
+            <div class="dpad">
+                <div></div>
+                <button class="btn" onmousedown="sendMove('FORWARD')" onmouseup="sendStop()" ontouchstart="sendMove('FORWARD')" ontouchend="sendStop()">▲</button>
+                <div></div>
+                <button class="btn" onmousedown="sendMove('LEFT')" onmouseup="sendStop()" ontouchstart="sendMove('LEFT')" ontouchend="sendStop()">◄</button>
+                <button class="btn btn-danger" onclick="sendStop()">■</button>
+                <button class="btn" onmousedown="sendMove('RIGHT')" onmouseup="sendStop()" ontouchstart="sendMove('RIGHT')" ontouchend="sendStop()">►</button>
+                <div></div>
+                <button class="btn" onmousedown="sendMove('BACKWARD')" onmouseup="sendStop()" ontouchstart="sendMove('BACKWARD')" ontouchend="sendStop()">▼</button>
+                <div></div>
+            </div>
+        </div>
+
+        <!-- Điều khiển Servo Camera & Canon -->
+        <div class="controls-section">
+            <label><b>Góc quay Servo & Camera</b></label>
+            <div style="margin-top: 10px;">
+                <span style="font-size: 13px; color: #aaa;">Camera Tilt (Lên / Xuống):</span>
+                <div class="row">
+                    <button class="btn btn-servo" onclick="sendServoTilt('up')">📷 Tilt Lên ▲</button>
+                    <button class="btn btn-servo" onclick="sendServoTilt('down')">📷 Tilt Xuống ▼</button>
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <span style="font-size: 13px; color: #aaa;">Canon Servo (Tự động về giữa sau 3s):</span>
+                <div class="row">
+                    <button class="btn btn-servo" onclick="sendServoCanon('left')">◀ Canon Trái</button>
+                    <button class="btn btn-servo" onclick="sendServoCanon('right')">Canon Phải ▶</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CỘT BÊN PHẢI: CAMERA STREAM (CỐ ĐỊNH GIỮA MÀN HÌNH) -->
+    <div class="right-panel">
+        <h3>📹 Camera Trực Tuyến</h3>
+        
+        <!-- Khung Video Stream -->
+        <img src="/video_feed" class="stream-box" alt="Camera Stream Loading...">
+
+        <!-- Bảng thông số trạng thái thời gian thực -->
+        <div class="status-box">
+            <p style="margin: 4px 0;">Trạng thái động cơ: <b id="status-text" style="color: #00ff00;">STOP</b></p>
+            <p style="margin: 4px 0;">Góc Servo Cam: <b id="pos-text">1100</b></p>
+            <p style="margin: 4px 0;">Góc Servo Canon: <b id="gpos-text">1400</b></p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const socket = io();
+    const speedSlider = document.getElementById('speedRange');
+    let currentDir = 'STOP';
+
+    speedSlider.oninput = function() {
+        document.getElementById('speed-text').innerText = this.value;
+        if(currentDir !== 'STOP') {
+            sendMove(currentDir);
+        }
+    }
+
+    function sendMove(dir) {
+        currentDir = dir;
+        socket.emit('move', { dir: dir, speed: parseInt(speedSlider.value) });
+    }
+
+    function sendStop() {
+        currentDir = 'STOP';
+        socket.emit('stop');
+    }
+
+    function sendServoTilt(action) {
+        socket.emit('servo_tilt', { action: action });
+    }
+
+    function sendServoCanon(position) {
+        socket.emit('servo_canon', { position: position });
+    }
+
+    // Lắng nghe cập nhật trạng thái từ Raspberry Pi
+    socket.on('status_update', (data) => {
+        document.getElementById('status-text').innerText = data.dir;
+        document.getElementById('speed-text').innerText = data.speed;
+        document.getElementById('pos-text').innerText = data.pos;
+        document.getElementById('gpos-text').innerText = data.gpos;
+    });
+</script>
+
+</body>
+</html>
