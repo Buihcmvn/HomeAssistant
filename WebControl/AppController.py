@@ -163,7 +163,7 @@ def handle_servo_canon(data):
     if position == 'left':
         GPos = 500
     elif position == 'right':
-        GPos = 2700
+        GPos = 2500
         
     servo_canon.runServo(GPos)
     print("Servo Canon Position: {}".format(GPos))
