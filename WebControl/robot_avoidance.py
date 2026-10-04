@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch()  # Bắt buộc cho Flask-SocketIO bất đồng bộ
+eventlet.monkey_patch()  # Required for asynchronous Flask-SocketIO
 
 import time
 import cv2
@@ -8,7 +8,7 @@ import numpy as np
 from flask import Flask, render_template, Response
 from flask_socketio import SocketIO, emit
 
-# Tích hợp thư viện phần cứng PCA9685
+# Integrate PCA9685 hardware library
 try:
     from PCA9685 import PCA9685
     pwm = PCA9685(0x40, debug=False)
@@ -22,25 +22,25 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'robot_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Biến trạng thái toàn cục
+# Global state variables
 current_dir = "STOP"
 current_speed = 60
-auto_mode = False  # Cờ bật/tắt chế độ tự động tránh vật cản
+auto_mode = False  # Flag to toggle auto obstacle avoidance mode
 Pos = 1100
 GPos = 1400
 
-# Hàm điều khiển động cơ phần cứng
+# Hardware motor control function
 def set_motor_control(direction, speed):
     if not HAS_HARDWARE:
         print(f"[SIMULATION] Motor Drive: {direction} at speed {speed}")
         return
     
-    # Chuyển đổi mức speed (0-100) sang xung PWM (0-4095)
+    # Convert speed level (0-100) to PWM pulse width (0-4095)
     pwm_val = int(speed * 40.95)
     
     if direction == "FORWARD":
-        # Ví dụ cấu hình chân motor cho tiến (tùy thuộc vào phần cứng thực tế của bạn)
-        pwm.set书PWM(0, 0, pwm_val) # Thay thế bằng chân cắm thực tế của bạn
+        # Example motor pin configuration for forward movement (depends on your hardware setup)
+        pwm.setPWM(0, 0, pwm_val)  # Replace with your actual pin configuration
         print(f"Motor Moving FORWARD with speed {speed}")
     elif direction == "BACKWARD":
         print(f"Motor Moving BACKWARD with speed {speed}")
@@ -52,13 +52,13 @@ def set_motor_control(direction, speed):
         # STOP
         print(f"Motor STOP")
 
-# Thuật toán xử lý ảnh nhận diện vật cản đơn giản (Dựa vào độ sáng hoặc ngưỡng màu/vật thể gần)
+# Simple obstacle detection image processing algorithm (based on contrast/edge detection)
 def detect_obstacle(frame):
-    # Chuyển sang ảnh xám và làm mờ để giảm nhiễu
+    # Convert to grayscale and blur to reduce noise
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     
-    # Chia khung hình thành 3 vùng: Trái, Giữa, Phải
+    # Divide the frame into 3 regions: Left, Center, Right
     h, w = blurred.shape
     third_w = w // 3
     
@@ -66,15 +66,14 @@ def detect_obstacle(frame):
     center_region = blurred[:, third_w:2*third_w]
     right_region = blurred[:, 2*third_w:]
     
-    # Tính toán mức độ "vật cản/vật thể" dựa trên biên độ cạnh (Canny Edge) hoặc độ tương phản
-    # Ở đây dùng ngưỡng đơn giản: đếm số điểm ảnh sáng/tối hoặc biên cạnh vượt ngưỡng
+    # Calculate obstacle level based on edge amplitude (Canny Edge)
     edges = cv2.Canny(blurred, 50, 150)
     
     left_val = np.sum(edges[:, :third_w])
     center_val = np.sum(edges[:, third_w:2*third_w])
     right_val = np.sum(edges[:, 2*third_w:])
     
-    # Ngưỡng phát hiện vật cản (có thể tinh chỉnh theo thực tế ánh sáng phòng)
+    # Obstacle detection threshold (can be fine-tuned based on actual lighting conditions)
     THRESHOLD = 2000000 
     
     obstacle_center = center_val > THRESHOLD
@@ -83,7 +82,7 @@ def detect_obstacle(frame):
     
     return obstacle_center, obstacle_left, obstacle_right
 
-# Luồng camera và logic tự động né vật cản chạy song song
+# Camera stream and parallel obstacle avoidance logic thread
 def generate_frames():
     global current_dir, current_speed, auto_mode
     camera = cv2.VideoCapture(0)
@@ -98,32 +97,32 @@ def generate_frames():
 
         frame = imutils.resize(frame, width=480)
         
-        # Nếu bật chế độ tự động tránh vật cản
+        # If auto avoidance mode is enabled
         if auto_mode:
             c_obs, l_obs, r_obs = detect_obstacle(frame)
             
             if c_obs:
-                # Nếu vật cản ở chính giữa -> Lùi lại và rẽ hướng thoáng hơn
+                # If obstacle is in the center -> Reverse and turn toward a clearer direction
                 current_dir = "BACKWARD"
                 set_motor_control("BACKWARD", current_speed)
                 cv2.putText(frame, "OBSTACLE CENTER! REVERSING...", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             elif l_obs:
-                # Nếu vật cản bên trái -> Rẽ phải né
+                # If obstacle is on the left -> Turn right to avoid
                 current_dir = "RIGHT"
                 set_motor_control("RIGHT", current_speed)
                 cv2.putText(frame, "OBSTACLE LEFT -> TURNING RIGHT", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
             elif r_obs:
-                # Nếu vật cản bên phải -> Rẽ trái né
+                # If obstacle is on the right -> Turn left to avoid
                 current_dir = "LEFT"
                 set_motor_control("LEFT", current_speed)
                 cv2.putText(frame, "OBSTACLE RIGHT -> TURNING LEFT", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
             else:
-                # Không có vật cản -> Tiến thẳng
+                # Path clear -> Move forward
                 current_dir = "FORWARD"
                 set_motor_control("FORWARD", current_speed)
                 cv2.putText(frame, "PATH CLEAR -> MOVING FORWARD", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        # Hiển thị thông số lên khung hình video stream
+        # Display status parameters on the video stream frame
         cv2.putText(frame, "MODE: {} | STATUS: {}".format("AUTO" if auto_mode else "MANUAL", current_dir), (10, 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.putText(frame, "SPD: {} | TILT: {}".format(current_speed, Pos), (10, 50),
@@ -145,12 +144,12 @@ def index():
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# Socket.IO nhận lệnh từ giao diện web
+# Socket.IO event handler for receiving commands from the web GUI
 @socketio.on('move')
 def handle_move(data):
     global current_dir, current_speed, auto_mode
     if auto_mode:
-        return  # Đang ở chế độ tự động thì bỏ qua lệnh tay từ web
+        return  # Ignore manual web commands if in auto mode
     
     current_dir = data.get('dir', 'STOP')
     current_speed = data.get('speed', 60)
