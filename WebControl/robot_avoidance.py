@@ -29,36 +29,32 @@ auto_mode = False  # Flag to toggle auto obstacle avoidance mode
 Pos = 1100
 GPos = 1400
 
-# Hardware motor control function
+# Hardware motor control function (Using .format() for Python 3.5 compatibility)
 def set_motor_control(direction, speed):
     if not HAS_HARDWARE:
-        print(f"[SIMULATION] Motor Drive: {direction} at speed {speed}")
+        print("[SIMULATION] Motor Drive: {} at speed {}".format(direction, speed))
         return
     
     # Convert speed level (0-100) to PWM pulse width (0-4095)
     pwm_val = int(speed * 40.95)
     
     if direction == "FORWARD":
-        # Example motor pin configuration for forward movement (depends on your hardware setup)
         pwm.setPWM(0, 0, pwm_val)  # Replace with your actual pin configuration
-        print(f"Motor Moving FORWARD with speed {speed}")
+        print("Motor Moving FORWARD with speed {}".format(speed))
     elif direction == "BACKWARD":
-        print(f"Motor Moving BACKWARD with speed {speed}")
+        print("Motor Moving BACKWARD with speed {}".format(speed))
     elif direction == "LEFT":
-        print(f"Motor Turning LEFT")
+        print("Motor Turning LEFT")
     elif direction == "RIGHT":
-        print(f"Motor Turning RIGHT")
+        print("Motor Turning RIGHT")
     else:
-        # STOP
-        print(f"Motor STOP")
+        print("Motor STOP")
 
-# Simple obstacle detection image processing algorithm (based on contrast/edge detection)
+# Simple obstacle detection image processing algorithm
 def detect_obstacle(frame):
-    # Convert to grayscale and blur to reduce noise
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     
-    # Divide the frame into 3 regions: Left, Center, Right
     h, w = blurred.shape
     third_w = w // 3
     
@@ -66,14 +62,12 @@ def detect_obstacle(frame):
     center_region = blurred[:, third_w:2*third_w]
     right_region = blurred[:, 2*third_w:]
     
-    # Calculate obstacle level based on edge amplitude (Canny Edge)
     edges = cv2.Canny(blurred, 50, 150)
     
     left_val = np.sum(edges[:, :third_w])
     center_val = np.sum(edges[:, third_w:2*third_w])
     right_val = np.sum(edges[:, 2*third_w:])
     
-    # Obstacle detection threshold (can be fine-tuned based on actual lighting conditions)
     THRESHOLD = 2000000 
     
     obstacle_center = center_val > THRESHOLD
@@ -97,32 +91,26 @@ def generate_frames():
 
         frame = imutils.resize(frame, width=480)
         
-        # If auto avoidance mode is enabled
         if auto_mode:
             c_obs, l_obs, r_obs = detect_obstacle(frame)
             
             if c_obs:
-                # If obstacle is in the center -> Reverse and turn toward a clearer direction
                 current_dir = "BACKWARD"
                 set_motor_control("BACKWARD", current_speed)
                 cv2.putText(frame, "OBSTACLE CENTER! REVERSING...", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             elif l_obs:
-                # If obstacle is on the left -> Turn right to avoid
                 current_dir = "RIGHT"
                 set_motor_control("RIGHT", current_speed)
                 cv2.putText(frame, "OBSTACLE LEFT -> TURNING RIGHT", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
             elif r_obs:
-                # If obstacle is on the right -> Turn left to avoid
                 current_dir = "LEFT"
                 set_motor_control("LEFT", current_speed)
                 cv2.putText(frame, "OBSTACLE RIGHT -> TURNING LEFT", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
             else:
-                # Path clear -> Move forward
                 current_dir = "FORWARD"
                 set_motor_control("FORWARD", current_speed)
                 cv2.putText(frame, "PATH CLEAR -> MOVING FORWARD", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        # Display status parameters on the video stream frame
         cv2.putText(frame, "MODE: {} | STATUS: {}".format("AUTO" if auto_mode else "MANUAL", current_dir), (10, 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.putText(frame, "SPD: {} | TILT: {}".format(current_speed, Pos), (10, 50),
@@ -144,12 +132,11 @@ def index():
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# Socket.IO event handler for receiving commands from the web GUI
 @socketio.on('move')
 def handle_move(data):
     global current_dir, current_speed, auto_mode
     if auto_mode:
-        return  # Ignore manual web commands if in auto mode
+        return  
     
     current_dir = data.get('dir', 'STOP')
     current_speed = data.get('speed', 60)
@@ -167,7 +154,7 @@ def handle_stop():
 def handle_toggle_auto(data):
     global auto_mode
     auto_mode = data.get('auto', False)
-    print(f"Auto Avoidance Mode set to: {auto_mode}")
+    print("Auto Avoidance Mode set to: {}".format(auto_mode))
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
