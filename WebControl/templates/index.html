@@ -119,13 +119,13 @@
             <label><b>Di chuyển (Motor Drive)</b></label>
             <div class="dpad">
                 <div></div>
-                <button class="btn" onmousedown="sendMove('FORWARD')" onmouseup="sendStop()" ontouchstart="sendMove('FORWARD')" ontouchend="sendStop()">▲</button>
+                <button class="btn" onclick="sendMove('FORWARD')">▲</button>
                 <div></div>
-                <button class="btn" onmousedown="sendMove('LEFT')" onmouseup="sendStop()" ontouchstart="sendMove('LEFT')" ontouchend="sendStop()">◄</button>
+                <button class="btn" onclick="sendMove('LEFT')">◄</button>
                 <button class="btn btn-danger" onclick="sendStop()">■</button>
-                <button class="btn" onmousedown="sendMove('RIGHT')" onmouseup="sendStop()" ontouchstart="sendMove('RIGHT')" ontouchend="sendStop()">►</button>
+                <button class="btn" onclick="sendMove('RIGHT')">►</button>
                 <div></div>
-                <button class="btn" onmousedown="sendMove('BACKWARD')" onmouseup="sendStop()" ontouchstart="sendMove('BACKWARD')" ontouchend="sendStop()">▼</button>
+                <button class="btn" onclick="sendMove('BACKWARD')">▼</button>
                 <div></div>
             </div>
         </div>
