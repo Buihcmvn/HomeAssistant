@@ -291,11 +291,16 @@
     const speedSlider = document.getElementById('speedRange');
     let currentDir = 'STOP';
 
+    let throttleTimer;
     speedSlider.oninput = function() {
         document.getElementById('speed-text').innerText = this.value;
-        if(currentDir !== 'STOP') {
-            sendMove(currentDir);
-        }
+        if (throttleTimer) return;
+        throttleTimer = setTimeout(() => {
+            throttleTimer = null;
+            if(currentDir !== 'STOP') {
+                sendMove(currentDir);
+            }
+        }, 100); // only 10 times/second
     }
 
     function sendMove(dir) {

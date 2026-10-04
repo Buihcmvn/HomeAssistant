@@ -87,7 +87,7 @@ def generate_frames():
     while True:
         success, frame = camera.read()
         if not success:
-            time.sleep(0.01)
+            eventlet.sleep(0.01) # Dùng eventlet.sleep thay vì time.sleep để không nghẽn luồng
             continue
 
         frame = imutils.resize(frame, width=480)
@@ -103,6 +103,9 @@ def generate_frames():
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        # Nhường CPU nhẹ nhàng sau mỗi khung hình để WebSocket nhận lệnh kịp thời
+        eventlet.sleep(0.001)
 
 @app.route('/video_feed')
 def video_feed():
