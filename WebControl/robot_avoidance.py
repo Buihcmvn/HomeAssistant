@@ -25,7 +25,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # Global state variables
 current_dir = "STOP"
 current_speed = 60
-auto_mode = False  # Flag to toggle obstacle detection display mode
+auto_mode = False  # Flag to toggle obstacle detection display mode (ONLY FOR UI OVERLAY)
 Pos = 1100
 GPos = 1400
 
@@ -76,12 +76,12 @@ def detect_obstacle(frame):
     
     return obstacle_center, obstacle_left, obstacle_right
 
-# Camera stream and obstacle detection display thread
+# Camera stream and obstacle detection display thread (NO MOTOR CONTROL HERE)
 def generate_frames():
     global current_dir, current_speed, auto_mode
     camera = cv2.VideoCapture(0)
     
-    # Ép camera xuất ra định dạng MJPEG để OpenCV đọc mượt mà trên Linux và tránh lỗi V4L2
+    # Force MJPEG format to prevent OpenCV V4L2 unsupported pixel format errors on Linux
     camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -97,15 +97,15 @@ def generate_frames():
             h, w, _ = frame.shape
             third_w = w // 3
 
-            # Nếu bật chế độ nhận diện, tiến hành phân tích và đánh dấu vật cản lên màn hình (không điều khiển động cơ)
+            # If obstacle detection display mode is enabled, draw warning boxes on screen ONLY (No motor driving)
             if auto_mode:
                 c_obs, l_obs, r_obs = detect_obstacle(frame)
                 
-                # Vẽ các đường phân chia 3 vùng (Trái, Giữa, Phải)
+                # Draw vertical grid lines to divide 3 zones (Left, Center, Right)
                 cv2.line(frame, (third_w, 0), (third_w, h), (255, 255, 0), 1)
                 cv2.line(frame, (2 * third_w, 0), (2 * third_w, h), (255, 255, 0), 1)
 
-                # Đánh dấu và thông báo trực quan trên màn hình tùy theo vùng có vật cản
+                # Draw visual warnings based on detected obstacles
                 if c_obs:
                     cv2.rectangle(frame, (third_w, 0), (2 * third_w, h), (0, 0, 255), 2)
                     cv2.putText(frame, "OBSTACLE CENTER!", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
@@ -119,7 +119,7 @@ def generate_frames():
                 if not c_obs and not l_obs and not r_obs:
                     cv2.putText(frame, "PATH CLEAR", (150, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            # Hiển thị thông tin trạng thái lên khung hình video stream
+            # Display real-time status overlay on video stream
             cv2.putText(frame, "DETECT MODE: {} | CMD: {}".format("ON" if auto_mode else "OFF", current_dir), (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
             cv2.putText(frame, "SPD: {} | TILT: {}".format(current_speed, Pos), (10, 50),
@@ -150,6 +150,7 @@ def video_feed():
 @socketio.on('move')
 def handle_move(data):
     global current_dir, current_speed
+    # Manual control is ALWAYS active regardless of auto_mode toggle status
     current_dir = data.get('dir', 'STOP')
     current_speed = data.get('speed', 60)
     set_motor_control(current_dir, current_speed)
