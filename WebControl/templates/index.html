@@ -22,35 +22,37 @@
             background: var(--bg-color);
             color: var(--text-main);
             margin: 0;
-            padding: 15px;
+            padding: 10px;
         }
 
         header {
             text-align: center;
             border-bottom: 2px solid var(--border-color);
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
         }
 
         header h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 16px;
             letter-spacing: 1px;
             color: var(--accent-blue);
             text-transform: uppercase;
         }
 
+        /* Default layout: 1 column for portrait mobile */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: 1fr;
+            gap: 15px;
             max-width: 1200px;
             margin: auto;
         }
 
-        @media (max-width: 850px) {
+        /* Automatically switch to 2 columns on larger screens or when mobile device is rotated to LANDSCAPE */
+        @media (min-width: 768px), (orientation: landscape) {
             .dashboard-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
             }
         }
 
@@ -58,19 +60,19 @@
             background: var(--panel-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 15px;
+            padding: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
 
         .panel-title {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             border-left: 3px solid var(--accent-blue);
-            padding-left: 8px;
+            padding-left: 6px;
         }
 
         .stream-container {
@@ -85,31 +87,33 @@
         .stream-box {
             width: 100%;
             display: block;
+            max-height: 280px;
+            object-fit: contain;
         }
 
         .hud-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-top: 10px;
+            gap: 6px;
+            margin-top: 8px;
         }
 
         .hud-item {
             background: #0f172a;
             border: 1px solid var(--border-color);
-            padding: 8px;
+            padding: 6px;
             border-radius: 4px;
             text-align: center;
         }
 
         .hud-label {
-            font-size: 10px;
+            font-size: 9px;
             color: var(--text-muted);
             text-transform: uppercase;
         }
 
         .hud-value {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             color: var(--accent-green);
             margin-top: 2px;
@@ -119,14 +123,14 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin: 15px 0;
+            margin: 10px 0;
         }
 
         .dpad {
             display: grid;
-            grid-template-columns: repeat(3, 65px);
-            grid-template-rows: repeat(3, 65px);
-            gap: 6px;
+            grid-template-columns: repeat(3, 55px);
+            grid-template-rows: repeat(3, 55px);
+            gap: 5px;
         }
 
         .btn {
@@ -134,10 +138,9 @@
             color: var(--text-main);
             border: 1px solid #374151;
             border-radius: 6px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.1s ease;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -159,14 +162,14 @@
         }
 
         .control-group {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .control-group label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         input[type=range] {
@@ -175,23 +178,23 @@
             background: #1f2937;
         }
 
-        /* Thiết kế công tắc gạt Toggle Switch */
+        /* Toggle switch design */
         .auto-mode-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: #0f172a;
             border: 1px solid var(--border-color);
-            padding: 10px 12px;
+            padding: 8px 10px;
             border-radius: 6px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .switch {
             position: relative;
             display: inline-block;
-            width: 48px;
-            height: 24px;
+            width: 44px;
+            height: 22px;
         }
 
         .switch input { 
@@ -206,14 +209,14 @@
             top: 0; left: 0; right: 0; bottom: 0;
             background-color: #374151;
             transition: .3s;
-            border-radius: 24px;
+            border-radius: 22px;
         }
 
         .slider-toggle:before {
             position: absolute; 
             content: "";
-            height: 18px; 
-            width: 18px;
+            height: 16px; 
+            width: 16px;
             left: 3px; 
             bottom: 3px;
             background-color: white;
@@ -226,21 +229,21 @@
         }
 
         input:checked + .slider-toggle:before { 
-            transform: translateX(24px); 
+            transform: translateX(22px); 
         }
 
         .servo-container {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 6px;
+            margin-top: 5px;
         }
 
         .btn-servo {
             background: #065f46;
             border-color: #047857;
-            font-size: 13px;
-            padding: 10px;
+            font-size: 11px;
+            padding: 8px;
             color: var(--text-main);
             font-weight: bold;
             border-radius: 6px;
@@ -257,7 +260,7 @@
         .servo-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 8px;
             width: 100%;
         }
     </style>
@@ -270,15 +273,16 @@
 
 <div class="dashboard-grid">
     
-    <!-- CỘT TRÁI: CAMERA STREAM & HUD TELEMETRY -->
+    <!-- LEFT COLUMN: CAMERA STREAM & HUD TELEMETRY -->
     <div class="tech-panel">
         <div class="panel-title">Live Video Feed & Real-time Telemetry</div>
         
+        <!-- Added ID and onerror auto-reconnection handler for mobile browsers -->
         <div class="stream-container">
-            <img src="/video_feed" class="stream-box" alt="Live Feed Error">
+            <img id="videoStream" src="/video_feed" class="stream-box" alt="Connecting to Camera..." onerror="reloadStream(this)">
         </div>
 
-        <!-- Bảng HUD thông số -->
+        <!-- HUD telemetry grid -->
         <div class="hud-grid">
             <div class="hud-item">
                 <div class="hud-label">Status</div>
@@ -295,26 +299,26 @@
         </div>
     </div>
 
-    <!-- CỘT PHẢI: ĐIỀU KHIỂN ĐỘNG CƠ & SERVO -->
+    <!-- RIGHT COLUMN: MOTOR DRIVE & ACTUATORS -->
     <div class="tech-panel">
         <div class="panel-title">Motion Drive & Actuators</div>
 
-        <!-- Thanh chỉnh tốc độ -->
+        <!-- Speed control slider -->
         <div class="control-group">
             <label>PWM MOTOR SPEED: <span id="speed-text" style="color: var(--accent-green);">60</span>%</label>
             <input type="range" id="speedRange" min="20" max="100" value="60">
         </div>
 
-        <!-- Công tắc chuyển Auto Mode -->
+        <!-- Auto Mode toggle switch -->
         <div class="auto-mode-container">
-            <span style="font-size: 12px; font-weight: bold; color: var(--text-main);">AUTO AVOIDANCE MODE</span>
+            <span style="font-size: 11px; font-weight: bold; color: var(--text-main);">AUTO AVOIDANCE MODE</span>
             <label class="switch">
                 <input type="checkbox" id="autoToggle" onchange="toggleAutoMode(this)">
                 <span class="slider-toggle"></span>
             </label>
         </div>
 
-        <!-- D-Pad Điều hướng -->
+        <!-- D-Pad Directional Controls -->
         <div class="dpad-wrapper">
             <div class="dpad">
                 <div></div>
@@ -329,8 +333,8 @@
             </div>
         </div>
 
-        <!-- Điều khiển Servo -->
-        <div class="control-group" style="margin-top: 20px;">
+        <!-- Servo Controls -->
+        <div class="control-group" style="margin-top: 10px;">
             <label>CAMERA TILT (UP / DOWN)</label>
             <div class="servo-container">
                 <button class="btn-servo" onclick="sendServoTilt('up')">▲ Tilt Up</button>
@@ -338,7 +342,7 @@
             </div>
         </div>
 
-        <div class="control-group" style="margin-top: 15px;">
+        <div class="control-group" style="margin-top: 10px;">
             <label>CANON SERVO (AUTO-CENTER AFTER 3S)</label>
             <div class="servo-row">
                 <button class="btn-servo" onclick="sendServoCanon('left')">◀ Canon Left</button>
@@ -353,6 +357,14 @@
     const socket = io();
     const speedSlider = document.getElementById('speedRange');
     let currentDir = 'STOP';
+
+    // Auto-reconnection function for mobile video stream if connection drops
+    function reloadStream(img) {
+        setTimeout(() => {
+            let timestamp = new Date().getTime();
+            img.src = "/video_feed?t=" + timestamp;
+        }, 1000);
+    }
 
     let throttleTimer;
     speedSlider.oninput = function() {
