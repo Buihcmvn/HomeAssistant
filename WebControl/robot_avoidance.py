@@ -78,7 +78,7 @@ def set_motor(direction, speed):
         pwm.setDutycycle(PWMA, speed); pwm.setLevel(AIN1, 1); pwm.setLevel(AIN2, 0)
         pwm.setDutycycle(PWMB, speed); pwm.setLevel(BIN1, 0); pwm.setLevel(BIN2, 1)
 
-# Improved obstacle detection using contour/blob analysis in the lower ROI
+# Improved obstacle detection using contour/blob analysis in the lower ROI (Compatible with all OpenCV versions)
 def detect_obstacle(frame):
     h, w, _ = frame.shape
     
@@ -100,8 +100,12 @@ def detect_obstacle(frame):
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     
-    # Find contours of potential obstacles
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Find contours safely across different OpenCV versions (3.x and 4.x)
+    contours_result = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if len(contours_result) == 3:
+        _, contours, _ = contours_result
+    else:
+        contours, _ = contours_result
     
     obstacle_left = False
     obstacle_center = False
@@ -115,7 +119,6 @@ def detect_obstacle(frame):
             M = cv2.moments(cnt)
             if M["m00"] != 0:
                 cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
                 
                 # Check which zone the obstacle centroid falls into
                 if cx < third_w:
@@ -125,9 +128,6 @@ def detect_obstacle(frame):
                 else:
                     obstacle_right = True
                     
-                # Optionally draw bounding box around detected obstacles on the ROI coordinate system
-                # (We will draw visual feedback directly on the main frame in the generator function)
-                
     return obstacle_center, obstacle_left, obstacle_right
 
 # ---------------------------------------------------------
