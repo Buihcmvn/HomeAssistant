@@ -131,7 +131,7 @@ def detect_obstacle(frame):
     return obstacle_center, obstacle_left, obstacle_right
 
 # ---------------------------------------------------------
-# 2. CAMERA STREAM GENERATOR (MJPEG)
+# 2. CAMERA STREAM GENERATOR (MJPEG - SAFE VERSION)
 # ---------------------------------------------------------
 def generate_frames():
     global auto_mode
@@ -146,46 +146,50 @@ def generate_frames():
         while True:
             success, frame = camera.read()
             if not success or frame is None:
-                eventlet.sleep(0.01)
+                eventlet.sleep(0.05)
                 continue
 
-            frame = imutils.resize(frame, width=480)
-            h, w, _ = frame.shape
-            third_w = w // 3
+            try:
+                frame = imutils.resize(frame, width=480)
+                h, w, _ = frame.shape
+                third_w = w // 3
 
-            # If obstacle detection display mode is enabled, analyze and draw visual alerts
-            if auto_mode:
-                c_obs, l_obs, r_obs = detect_obstacle(frame)
+                # If obstacle detection display mode is enabled, analyze and draw visual alerts
+                if auto_mode:
+                    c_obs, l_obs, r_obs = detect_obstacle(frame)
+                    
+                    # Draw vertical grid lines dividing 3 zones (Left, Center, Right)
+                    cv2.line(frame, (third_w, int(h * 0.4)), (third_w, h), (255, 255, 0), 1)
+                    cv2.line(frame, (2 * third_w, int(h * 0.4)), (2 * third_w, h), (255, 255, 0), 1)
+
+                    # Draw visual warnings based on detected obstacles
+                    if c_obs:
+                        cv2.rectangle(frame, (third_w, int(h * 0.4)), (2 * third_w, h), (0, 0, 255), 2)
+                        cv2.putText(frame, "OBSTACLE CENTER!", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    if l_obs:
+                        cv2.rectangle(frame, (0, int(h * 0.4)), (third_w, h), (0, 165, 255), 2)
+                        cv2.putText(frame, "OBSTACLE LEFT", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                    if r_obs:
+                        cv2.rectangle(frame, (2 * third_w, int(h * 0.4)), (w, h), (0, 165, 255), 2)
+                        cv2.putText(frame, "OBSTACLE RIGHT", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                    
+                    if not c_obs and not l_obs and not r_obs:
+                        cv2.putText(frame, "PATH CLEAR", (150, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+                ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                if not ret:
+                    eventlet.sleep(0.01)
+                    continue
+                    
+                frame_bytes = buffer.tobytes()
+
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            
+            except Exception as e:
+                # Catch any unexpected image processing error to prevent stream crashing
+                print("Frame processing error: {}".format(e))
                 
-                # Draw vertical grid lines dividing 3 zones (Left, Center, Right)
-                cv2.line(frame, (third_w, int(h * 0.4)), (third_w, h), (255, 255, 0), 1)
-                cv2.line(frame, (2 * third_w, int(h * 0.4)), (2 * third_w, h), (255, 255, 0), 1)
-
-                # Draw visual warnings based on detected obstacles
-                if c_obs:
-                    cv2.rectangle(frame, (third_w, int(h * 0.4)), (2 * third_w, h), (0, 0, 255), 2)
-                    cv2.putText(frame, "OBSTACLE CENTER!", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-                if l_obs:
-                    cv2.rectangle(frame, (0, int(h * 0.4)), (third_w, h), (0, 165, 255), 2)
-                    cv2.putText(frame, "OBSTACLE LEFT", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
-                if r_obs:
-                    cv2.rectangle(frame, (2 * third_w, int(h * 0.4)), (w, h), (0, 165, 255), 2)
-                    cv2.putText(frame, "OBSTACLE RIGHT", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
-                
-                if not c_obs and not l_obs and not r_obs:
-                    cv2.putText(frame, "PATH CLEAR", (150, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
-            if not ret:
-                eventlet.sleep(0.01)
-                continue
-                
-            frame_bytes = buffer.tobytes()
-
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
-            # Yield CPU slightly after each frame so WebSocket commands are received promptly
             eventlet.sleep(0.01)
     finally:
         camera.release()
