@@ -25,7 +25,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # Global state variables
 current_dir = "STOP"
 current_speed = 60
-auto_mode = False  # Flag to toggle auto obstacle avoidance mode
+auto_mode = False  # Flag to toggle obstacle detection display mode
 Pos = 1100
 GPos = 1400
 
@@ -76,53 +76,68 @@ def detect_obstacle(frame):
     
     return obstacle_center, obstacle_left, obstacle_right
 
-# Camera stream and parallel obstacle avoidance logic thread
+# Camera stream and obstacle detection display thread
 def generate_frames():
     global current_dir, current_speed, auto_mode
     camera = cv2.VideoCapture(0)
+    
+    # Ép camera xuất ra định dạng MJPEG để OpenCV đọc mượt mà trên Linux và tránh lỗi V4L2
+    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-    while True:
-        success, frame = camera.read()
-        if not success:
-            eventlet.sleep(0.01)
-            continue
+    try:
+        while True:
+            success, frame = camera.read()
+            if not success or frame is None:
+                eventlet.sleep(0.01)
+                continue
 
-        frame = imutils.resize(frame, width=480)
-        
-        if auto_mode:
-            c_obs, l_obs, r_obs = detect_obstacle(frame)
+            frame = imutils.resize(frame, width=480)
+            h, w, _ = frame.shape
+            third_w = w // 3
+
+            # Nếu bật chế độ nhận diện, tiến hành phân tích và đánh dấu vật cản lên màn hình (không điều khiển động cơ)
+            if auto_mode:
+                c_obs, l_obs, r_obs = detect_obstacle(frame)
+                
+                # Vẽ các đường phân chia 3 vùng (Trái, Giữa, Phải)
+                cv2.line(frame, (third_w, 0), (third_w, h), (255, 255, 0), 1)
+                cv2.line(frame, (2 * third_w, 0), (2 * third_w, h), (255, 255, 0), 1)
+
+                # Đánh dấu và thông báo trực quan trên màn hình tùy theo vùng có vật cản
+                if c_obs:
+                    cv2.rectangle(frame, (third_w, 0), (2 * third_w, h), (0, 0, 255), 2)
+                    cv2.putText(frame, "OBSTACLE CENTER!", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                if l_obs:
+                    cv2.rectangle(frame, (0, 0), (third_w, h), (0, 165, 255), 2)
+                    cv2.putText(frame, "OBSTACLE LEFT", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                if r_obs:
+                    cv2.rectangle(frame, (2 * third_w, 0), (w, h), (0, 165, 255), 2)
+                    cv2.putText(frame, "OBSTACLE RIGHT", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                
+                if not c_obs and not l_obs and not r_obs:
+                    cv2.putText(frame, "PATH CLEAR", (150, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+            # Hiển thị thông tin trạng thái lên khung hình video stream
+            cv2.putText(frame, "DETECT MODE: {} | CMD: {}".format("ON" if auto_mode else "OFF", current_dir), (10, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            cv2.putText(frame, "SPD: {} | TILT: {}".format(current_speed, Pos), (10, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+            if not ret:
+                eventlet.sleep(0.01)
+                continue
+                
+            frame_bytes = buffer.tobytes()
+
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
             
-            if c_obs:
-                current_dir = "BACKWARD"
-                set_motor_control("BACKWARD", current_speed)
-                cv2.putText(frame, "OBSTACLE CENTER! REVERSING...", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-            elif l_obs:
-                current_dir = "RIGHT"
-                set_motor_control("RIGHT", current_speed)
-                cv2.putText(frame, "OBSTACLE LEFT -> TURNING RIGHT", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
-            elif r_obs:
-                current_dir = "LEFT"
-                set_motor_control("LEFT", current_speed)
-                cv2.putText(frame, "OBSTACLE RIGHT -> TURNING LEFT", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
-            else:
-                current_dir = "FORWARD"
-                set_motor_control("FORWARD", current_speed)
-                cv2.putText(frame, "PATH CLEAR -> MOVING FORWARD", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-        cv2.putText(frame, "MODE: {} | STATUS: {}".format("AUTO" if auto_mode else "MANUAL", current_dir), (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        cv2.putText(frame, "SPD: {} | TILT: {}".format(current_speed, Pos), (10, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-
-        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
-        frame_bytes = buffer.tobytes()
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        
-        eventlet.sleep(0.01)
+            eventlet.sleep(0.01)
+    finally:
+        camera.release()
 
 @app.route('/')
 def index():
@@ -134,10 +149,7 @@ def video_feed():
 
 @socketio.on('move')
 def handle_move(data):
-    global current_dir, current_speed, auto_mode
-    if auto_mode:
-        return  
-    
+    global current_dir, current_speed
     current_dir = data.get('dir', 'STOP')
     current_speed = data.get('speed', 60)
     set_motor_control(current_dir, current_speed)
@@ -145,7 +157,7 @@ def handle_move(data):
 
 @socketio.on('stop')
 def handle_stop():
-    global current_dir, auto_mode
+    global current_dir, current_speed
     current_dir = "STOP"
     set_motor_control("STOP", 0)
     socketio.emit('status_update', {'dir': current_dir, 'speed': current_speed, 'pos': Pos, 'gpos': GPos})
@@ -154,7 +166,7 @@ def handle_stop():
 def handle_toggle_auto(data):
     global auto_mode
     auto_mode = data.get('auto', False)
-    print("Auto Avoidance Mode set to: {}".format(auto_mode))
+    print("Obstacle Detection Display Mode set to: {}".format(auto_mode))
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
