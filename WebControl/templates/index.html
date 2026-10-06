@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Ngăn phóng to thu nhỏ, tối ưu khung nhìn trên mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ROBOT TELEMETRY & CONTROL SYSTEM</title>
+    <!-- Sử dụng Socket.IO bản 2.4.0 tương thích tuyệt đối với Python 3.5 trên Raspberry Pi -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.4.0/socket.io.js"></script>
     <style>
         :root {
@@ -23,6 +25,7 @@
             color: var(--text-main);
             margin: 0;
             padding: 10px;
+            touch-action: manipulation; /* Ngăn zoom chậm và cuộn trang ngoài ý muốn khi chạm */
         }
 
         header {
@@ -40,7 +43,6 @@
             text-transform: uppercase;
         }
 
-        /* Default layout: 1 column for portrait mobile */
         .dashboard-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -49,7 +51,6 @@
             margin: auto;
         }
 
-        /* Automatically switch to 2 columns on larger screens or when mobile device is rotated to LANDSCAPE */
         @media (min-width: 768px), (orientation: landscape) {
             .dashboard-grid {
                 grid-template-columns: 1fr 1fr;
@@ -128,23 +129,24 @@
 
         .dpad {
             display: grid;
-            grid-template-columns: repeat(3, 55px);
-            grid-template-rows: repeat(3, 55px);
-            gap: 5px;
+            grid-template-columns: repeat(3, 65px);
+            grid-template-rows: repeat(3, 65px);
+            gap: 8px;
         }
 
         .btn {
             background: #1f2937;
             color: var(--text-main);
             border: 1px solid #374151;
-            border-radius: 6px;
-            font-size: 16px;
+            border-radius: 8px;
+            font-size: 20px;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             user-select: none;
+            -webkit-user-select: none;
         }
 
         .btn:active, .btn.active {
@@ -176,9 +178,9 @@
             width: 100%;
             accent-color: var(--accent-blue);
             background: #1f2937;
+            height: 8px;
         }
 
-        /* Toggle switch design */
         .auto-mode-container {
             display: flex;
             justify-content: space-between;
@@ -242,8 +244,8 @@
         .btn-servo {
             background: #065f46;
             border-color: #047857;
-            font-size: 11px;
-            padding: 8px;
+            font-size: 12px;
+            padding: 10px;
             color: var(--text-main);
             font-weight: bold;
             border-radius: 6px;
@@ -277,12 +279,10 @@
     <div class="tech-panel">
         <div class="panel-title">Live Video Feed & Real-time Telemetry</div>
         
-        <!-- Added ID and onerror auto-reconnection handler for mobile browsers -->
         <div class="stream-container">
             <img id="videoStream" src="/video_feed" class="stream-box" alt="Connecting to Camera..." onerror="reloadStream(this)">
         </div>
 
-        <!-- HUD telemetry grid -->
         <div class="hud-grid">
             <div class="hud-item">
                 <div class="hud-label">Status</div>
@@ -303,13 +303,11 @@
     <div class="tech-panel">
         <div class="panel-title">Motion Drive & Actuators</div>
 
-        <!-- Speed control slider -->
         <div class="control-group">
             <label>PWM MOTOR SPEED: <span id="speed-text" style="color: var(--accent-green);">60</span>%</label>
             <input type="range" id="speedRange" min="20" max="100" value="60">
         </div>
 
-        <!-- Auto Mode toggle switch -->
         <div class="auto-mode-container">
             <span style="font-size: 11px; font-weight: bold; color: var(--text-main);">AUTO AVOIDANCE MODE</span>
             <label class="switch">
@@ -318,17 +316,37 @@
             </label>
         </div>
 
-        <!-- D-Pad Directional Controls -->
+        <!-- D-Pad Directional Controls (Hỗ trợ cả cảm ứng di động và chuột máy tính) -->
         <div class="dpad-wrapper">
             <div class="dpad">
                 <div></div>
-                <button class="btn" onmousedown="sendMove('FORWARD')" onmouseup="sendStop()" ontouchstart="sendMove('FORWARD')" ontouchend="sendStop()">▲</button>
+                <button class="btn" 
+                    ontouchstart="event.preventDefault(); sendMove('FORWARD');" 
+                    ontouchend="event.preventDefault(); sendStop();"
+                    onmousedown="sendMove('FORWARD')" 
+                    onmouseup="sendStop()">▲</button>
                 <div></div>
-                <button class="btn" onmousedown="sendMove('LEFT')" onmouseup="sendStop()" ontouchstart="sendMove('LEFT')" ontouchend="sendStop()">◄</button>
+                
+                <button class="btn" 
+                    ontouchstart="event.preventDefault(); sendMove('LEFT');" 
+                    ontouchend="event.preventDefault(); sendStop();"
+                    onmousedown="sendMove('LEFT')" 
+                    onmouseup="sendStop()">◄</button>
+                
                 <button class="btn btn-danger" onclick="sendStop()">■</button>
-                <button class="btn" onmousedown="sendMove('RIGHT')" onmouseup="sendStop()" ontouchstart="sendMove('RIGHT')" ontouchend="sendStop()">►</button>
+                
+                <button class="btn" 
+                    ontouchstart="event.preventDefault(); sendMove('RIGHT');" 
+                    ontouchend="event.preventDefault(); sendStop();"
+                    onmousedown="sendMove('RIGHT')" 
+                    onmouseup="sendStop()">►</button>
                 <div></div>
-                <button class="btn" onmousedown="sendMove('BACKWARD')" onmouseup="sendStop()" ontouchstart="sendMove('BACKWARD')" ontouchend="sendStop()">▼</button>
+                
+                <button class="btn" 
+                    ontouchstart="event.preventDefault(); sendMove('BACKWARD');" 
+                    ontouchend="event.preventDefault(); sendStop();"
+                    onmousedown="sendMove('BACKWARD')" 
+                    onmouseup="sendStop()">▼</button>
                 <div></div>
             </div>
         </div>
@@ -354,11 +372,11 @@
 </div>
 
 <script>
+    // Kết nối Socket.IO bản 2.4.0
     const socket = io();
     const speedSlider = document.getElementById('speedRange');
     let currentDir = 'STOP';
 
-    // Auto-reconnection function for mobile video stream if connection drops
     function reloadStream(img) {
         setTimeout(() => {
             let timestamp = new Date().getTime();
