@@ -78,26 +78,56 @@ def set_motor(direction, speed):
         pwm.setDutycycle(PWMA, speed); pwm.setLevel(AIN1, 1); pwm.setLevel(AIN2, 0)
         pwm.setDutycycle(PWMB, speed); pwm.setLevel(BIN1, 0); pwm.setLevel(BIN2, 1)
 
-# Simple obstacle detection image processing algorithm
+# Improved obstacle detection using contour/blob analysis in the lower ROI
 def detect_obstacle(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    h, w, _ = frame.shape
+    
+    # Crop to the lower half of the frame to ignore distant background (walls, ceiling)
+    roi = frame[int(h * 0.4):, :]
+    rh, rw, _ = roi.shape
+    third_w = rw // 3
+    
+    # Convert ROI to grayscale and apply slight blur to reduce floor texture noise
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     
-    h, w = blurred.shape
-    third_w = w // 3
+    # Use adaptive thresholding to separate objects from the floor background
+    thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                   cv2.THRESH_BINARY_INV, 15, 5)
     
-    edges = cv2.Canny(blurred, 50, 150)
+    # Remove small noise pixels using morphological operations
+    kernel = np.ones((5, 5), np.uint8)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     
-    left_val = np.sum(edges[:, :third_w])
-    center_val = np.sum(edges[:, third_w:2*third_w])
-    right_val = np.sum(edges[:, 2*third_w:])
+    # Find contours of potential obstacles
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    THRESHOLD = 500000 
+    obstacle_left = False
+    obstacle_center = False
+    obstacle_right = False
     
-    obstacle_center = center_val > THRESHOLD
-    obstacle_left = left_val > THRESHOLD
-    obstacle_right = right_val > THRESHOLD
+    min_contour_area = 1500  # Minimum pixel area to be considered a valid obstacle
     
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area > min_contour_area:
+            M = cv2.moments(cnt)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                
+                # Check which zone the obstacle centroid falls into
+                if cx < third_w:
+                    obstacle_left = True
+                elif cx < 2 * third_w:
+                    obstacle_center = True
+                else:
+                    obstacle_right = True
+                    
+                # Optionally draw bounding box around detected obstacles on the ROI coordinate system
+                # (We will draw visual feedback directly on the main frame in the generator function)
+                
     return obstacle_center, obstacle_left, obstacle_right
 
 # ---------------------------------------------------------
@@ -123,23 +153,23 @@ def generate_frames():
             h, w, _ = frame.shape
             third_w = w // 3
 
-            # If obstacle detection display mode is enabled, draw warning boxes and grid lines on screen
+            # If obstacle detection display mode is enabled, analyze and draw visual alerts
             if auto_mode:
                 c_obs, l_obs, r_obs = detect_obstacle(frame)
                 
                 # Draw vertical grid lines dividing 3 zones (Left, Center, Right)
-                cv2.line(frame, (third_w, 0), (third_w, h), (255, 255, 0), 1)
-                cv2.line(frame, (2 * third_w, 0), (2 * third_w, h), (255, 255, 0), 1)
+                cv2.line(frame, (third_w, int(h * 0.4)), (third_w, h), (255, 255, 0), 1)
+                cv2.line(frame, (2 * third_w, int(h * 0.4)), (2 * third_w, h), (255, 255, 0), 1)
 
                 # Draw visual warnings based on detected obstacles
                 if c_obs:
-                    cv2.rectangle(frame, (third_w, 0), (2 * third_w, h), (0, 0, 255), 2)
+                    cv2.rectangle(frame, (third_w, int(h * 0.4)), (2 * third_w, h), (0, 0, 255), 2)
                     cv2.putText(frame, "OBSTACLE CENTER!", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                 if l_obs:
-                    cv2.rectangle(frame, (0, 0), (third_w, h), (0, 165, 255), 2)
+                    cv2.rectangle(frame, (0, int(h * 0.4)), (third_w, h), (0, 165, 255), 2)
                     cv2.putText(frame, "OBSTACLE LEFT", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                 if r_obs:
-                    cv2.rectangle(frame, (2 * third_w, 0), (w, h), (0, 165, 255), 2)
+                    cv2.rectangle(frame, (2 * third_w, int(h * 0.4)), (w, h), (0, 165, 255), 2)
                     cv2.putText(frame, "OBSTACLE RIGHT", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                 
                 if not c_obs and not l_obs and not r_obs:
@@ -236,7 +266,7 @@ def handle_servo_canon(data):
 
 if __name__ == '__main__':
     print("=====================================================")
-    print(" ROBOT WEB SERVER (OBSTACLE OVERLAY & CANON) STARTED!")
+    print(" ROBOT WEB SERVER (ADAPTIVE CONTOUR DETECTION) STARTED!")
     print(" Access from browser: http://<IP_RASPBERRY_PI>:5000")
     print("=====================================================")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
