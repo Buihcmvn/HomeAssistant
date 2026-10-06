@@ -78,24 +78,26 @@ def set_motor(direction, speed):
         pwm.setDutycycle(PWMA, speed); pwm.setLevel(AIN1, 1); pwm.setLevel(AIN2, 0)
         pwm.setDutycycle(PWMB, speed); pwm.setLevel(BIN1, 0); pwm.setLevel(BIN2, 1)
 
-# Improved obstacle detection using contour/blob analysis in the lower ROI (Compatible with all OpenCV versions)
+# Obstacle detection restricted to the middle 1/3 horizontal strip (ROI)
 def detect_obstacle(frame):
     h, w, _ = frame.shape
     
-    # Crop to the lower half of the frame to ignore distant background (walls, ceiling)
-    roi = frame[int(h * 0.4):, :]
+    # Crop to the middle 1/3 horizontal strip of the frame based on user markup
+    roi_top = int(h * 0.35)
+    roi_bottom = int(h * 0.65)
+    roi = frame[roi_top:roi_bottom, :]
     rh, rw, _ = roi.shape
     third_w = rw // 3
     
-    # Convert ROI to grayscale and apply slight blur to reduce floor texture noise
+    # Convert ROI to grayscale and apply slight blur
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     
-    # Use adaptive thresholding to separate objects from the floor background
+    # Use adaptive thresholding to isolate objects inside the strip
     thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                    cv2.THRESH_BINARY_INV, 15, 5)
     
-    # Remove small noise pixels using morphological operations
+    # Remove noise using morphological operations
     kernel = np.ones((5, 5), np.uint8)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
@@ -111,7 +113,7 @@ def detect_obstacle(frame):
     obstacle_center = False
     obstacle_right = False
     
-    min_contour_area = 1500  # Minimum pixel area to be considered a valid obstacle
+    min_contour_area = 1000  # Minimum pixel area for detection in the strip
     
     for cnt in contours:
         area = cv2.contourArea(cnt)
@@ -131,7 +133,7 @@ def detect_obstacle(frame):
     return obstacle_center, obstacle_left, obstacle_right
 
 # ---------------------------------------------------------
-# 2. CAMERA STREAM GENERATOR (MJPEG - SAFE VERSION)
+# 2. CAMERA STREAM GENERATOR (MJPEG)
 # ---------------------------------------------------------
 def generate_frames():
     global auto_mode
@@ -153,24 +155,30 @@ def generate_frames():
                 frame = imutils.resize(frame, width=480)
                 h, w, _ = frame.shape
                 third_w = w // 3
+                
+                roi_top = int(h * 0.35)
+                roi_bottom = int(h * 0.65)
 
                 # If obstacle detection display mode is enabled, analyze and draw visual alerts
                 if auto_mode:
                     c_obs, l_obs, r_obs = detect_obstacle(frame)
                     
-                    # Draw vertical grid lines dividing 3 zones (Left, Center, Right)
-                    cv2.line(frame, (third_w, int(h * 0.4)), (third_w, h), (255, 255, 0), 1)
-                    cv2.line(frame, (2 * third_w, int(h * 0.4)), (2 * third_w, h), (255, 255, 0), 1)
+                    # Draw visual rectangle representing the scanning strip (matching user requirement)
+                    cv2.rectangle(frame, (0, roi_top), (w, roi_bottom), (0, 255, 255), 1)
+                    
+                    # Draw vertical grid lines dividing 3 zones inside the strip
+                    cv2.line(frame, (third_w, roi_top), (third_w, roi_bottom), (255, 255, 0), 1)
+                    cv2.line(frame, (2 * third_w, roi_top), (2 * third_w, roi_bottom), (255, 255, 0), 1)
 
                     # Draw visual warnings based on detected obstacles
                     if c_obs:
-                        cv2.rectangle(frame, (third_w, int(h * 0.4)), (2 * third_w, h), (0, 0, 255), 2)
+                        cv2.rectangle(frame, (third_w, roi_top), (2 * third_w, roi_bottom), (0, 0, 255), 2)
                         cv2.putText(frame, "OBSTACLE CENTER!", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                     if l_obs:
-                        cv2.rectangle(frame, (0, int(h * 0.4)), (third_w, h), (0, 165, 255), 2)
+                        cv2.rectangle(frame, (0, roi_top), (third_w, roi_bottom), (0, 165, 255), 2)
                         cv2.putText(frame, "OBSTACLE LEFT", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                     if r_obs:
-                        cv2.rectangle(frame, (2 * third_w, int(h * 0.4)), (w, h), (0, 165, 255), 2)
+                        cv2.rectangle(frame, (2 * third_w, roi_top), (w, roi_bottom), (0, 165, 255), 2)
                         cv2.putText(frame, "OBSTACLE RIGHT", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                     
                     if not c_obs and not l_obs and not r_obs:
@@ -187,7 +195,6 @@ def generate_frames():
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
             
             except Exception as e:
-                # Catch any unexpected image processing error to prevent stream crashing
                 print("Frame processing error: {}".format(e))
                 
             eventlet.sleep(0.01)
@@ -251,7 +258,6 @@ def handle_servo_canon(data):
     global GPos, canon_timer
     position = data.get('position')
     
-    # Cancel previous timer if active (to reset the 3s timeout on consecutive clicks)
     if canon_timer and canon_timer.is_alive():
         canon_timer.cancel()
 
@@ -264,13 +270,12 @@ def handle_servo_canon(data):
     print("Servo Canon Position: {}".format(GPos))
     emit('status_update', {'dir': current_dir, 'speed': current_speed, 'pos': Pos, 'gpos': GPos}, broadcast=True)
 
-    # Set a 3-second timer to automatically reset to center (1400)
     canon_timer = threading.Timer(3.0, reset_canon_to_center)
     canon_timer.start()
 
 if __name__ == '__main__':
     print("=====================================================")
-    print(" ROBOT WEB SERVER (ADAPTIVE CONTOUR DETECTION) STARTED!")
+    print(" ROBOT WEB SERVER (STRIP ROI DETECTION) STARTED!")
     print(" Access from browser: http://<IP_RASPBERRY_PI>:5000")
     print("=====================================================")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
