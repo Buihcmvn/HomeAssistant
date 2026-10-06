@@ -92,7 +92,7 @@ def detect_obstacle(frame):
     center_val = np.sum(edges[:, third_w:2*third_w])
     right_val = np.sum(edges[:, 2*third_w:])
     
-    THRESHOLD = 2000000 
+    THRESHOLD = 500000 
     
     obstacle_center = center_val > THRESHOLD
     obstacle_left = left_val > THRESHOLD
